@@ -5,14 +5,15 @@
 
 <style>
 body {margin: 0px auto; border: 15px solid #acacac;}
-#wrapper {position: relative; margin: auto; width: 800px; background: #ff00ff; overflow: auto;}
+#wrapper {position: relative; margin: auto; width: 800px; overflow: auto;}
 #content {width: 100%; }
-#top {width: 100%; margin-top: 25px;}
-#left {width: 350px; padding-right: 50px; height: 90%; background: purple; float: left;}
-.fromfile {background}
-.rollingpin {background-image: url('rollingpin.png') 0 0 no-repeat; width: 100%; height: 81px;}
-#right {width: 350px; height: 90%; padding-left: 50px; background: salmon; float: right;}
-
+#top {width: 100%; margin-top: 40 px;}
+#left {width: 350px; padding: 20px 50px 20px 0px; height: 90%; float: left;}
+.fromfile {width: 100%; height: 160px; background-image: url('shp.png'); background-repeat: no-repeat; background-position: center;}
+.rollingpin {background-image: url('rollingpin.png'); background-repeat: no-repeat; background-position: center; width: 100%; height: 81px;}
+.newfile {width: 100%; height: 280px; background-image: url('csv.png'); background-repeat: no-repeat; background-position: center;}
+#right {width: 350px; height: 90%; padding: 20px 0px 20px 50px; float: right;}
+#right p {font-family: Garamond; font-size: 20px; text-align: center;}
 </style>
 </head>
 <body>
@@ -21,11 +22,13 @@ body {margin: 0px auto; border: 15px solid #acacac;}
     
     
       <div id="top"><h1>DATA ROLLER</h1></div>
-      <div id="left">Lookin' at you R!
+      <div id="left">
+        <div class="fromfile"></div>
         <div class="rollingpin"></div>
+        <div class="newfile"></div>
         </div>
       
-      <div id="right">Creeper.</div>
+      <div id="right"><p>I want to rollout a</p><p>into</p></div>
       </div>
     </div>
 </body>
