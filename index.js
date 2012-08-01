@@ -1,27 +1,33 @@
 var http = require('http')
+var fs = require('fs')
 var stream = require('stream')
 var util = require('util')
 var shp2json = require('shp2json')
 var JSONStream = require('JSONStream')
+var ecstatic = require('ecstatic')(__dirname + '/attachments')
 
+var server = http.createServer(function (req, res) {
+  if (req.url === '/upload') handleShapefileUpload(req, res)
+  else ecstatic(req, res)
+}).listen(8080)
 
-http.createServer(function (req, res) {
-    var start = new Date
-    res.setHeader('content-type', "text/csv; charset=utf-8")
-    
-    var shpStream = shp2json(req)
-    var geoJSONParser = JSONStream.parse(['features', /./])
-    shpStream.on('error', function (err) {
-        res.setHeader('content-type', 'text/plain')
-        res.statusCode = 500
-        res.end(err + '\n')
-    })
-    shpStream.on('end', function() {
-      console.log((new Date - start) + 'ms')
-    })
-    var csvStream = new JSONToCSV()
-    shpStream.pipe(geoJSONParser).pipe(csvStream).pipe(res)
-}).listen(process.argv[2] || 80)
+function handleShapefileUpload(req, res) {
+  var start = new Date
+  res.setHeader('content-type', "text/csv")
+  
+  var shpStream = shp2json(req)
+  var geoJSONParser = JSONStream.parse(['features', /./])
+  shpStream.on('error', function (err) {
+      res.setHeader('content-type', 'text/plain')
+      res.statusCode = 500
+      res.end(err + '\n')
+  })
+  shpStream.on('end', function() {
+    console.log((new Date - start) + 'ms')
+  })
+  var csvStream = new JSONToCSV()
+  shpStream.pipe(geoJSONParser).pipe(csvStream).pipe(res)
+}
 
 function JSONToCSV() {
   this.headers = []
