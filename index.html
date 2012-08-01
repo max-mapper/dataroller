@@ -2,27 +2,32 @@
 <head>
   <link rel="stylesheet" type="text/css" media="all" href="normalize.css" />
   <link href='http://fonts.googleapis.com/css?family=Raleway:100' rel='stylesheet' type='text/css'>
-  <title>Data Rolling -- Let's Roll!</title>
+  <link href='http://fonts.googleapis.com/css?family=Questrial' rel='stylesheet' type='text/css'>
+  <title>Data Rolling</title>
 
 <style>
-body {margin: 0px auto; border: 15px solid #acacac;}
+body    {margin: 0px auto; border: 15px solid #acacac;}
+a       {color: #766625; text-decoration: none; padding-bottom: 2px; border-bottom: 1px dotted #766625; 
+        font-family: 'Questrial'; font-weight: 100; font-size: 12px;}
+a:hover {color: #d0b854; border-bottom: 1px dotted #d0b854;}
+
 #wrapper {position: relative; margin: auto; width: 750px; overflow: auto;}
 #content {width: 100%;}
+
 #top {margin: 40px 0px 0px 20px;}
 
-#left {width: 300px; padding: 20px 0px 20px 0px; float: left;}
-.fromfile {width: 100%; height: 160px; background-image: url('shp.png'); background-repeat: no-repeat; background-position: center;}
-.rollingpin {background-image: url('rollingpin.png'); background-repeat: no-repeat; background-position: center; width: 100%; height: 81px;}
-.newfile {width: 100%; height: 280px; background-image: url('csv.png'); background-repeat: no-repeat; background-position: center;}
+#left       {width: 300px; float: left; padding: 20px 0px 20px 0px; }
+.fromfile   {width: 100%; height: 160px; background-image: url('shp.png'); background-repeat: no-repeat; background-position: center;}
+.rollingpin {width: 100%; height: 81px;  background-image: url('rollingpin.png'); background-repeat: no-repeat; background-position: center;}
+.newfile    {width: 100%; height: 280px; background-image: url('csv.png'); background-repeat: no-repeat; background-position: center;}
 
-#right {width: 300px; padding: 120px 50px; float: right;}
-#right p {font-family: Garamond; font-size: 26px; text-align: center; color: #333; line-height: 2em;}
-.sansserif {font-family: 'Raleway'; font-weight: 100; font-size: 20px;}
+#right      {width: 300px; padding: 120px 50px; float: right;}
+#right p    {font-family: Garamond; font-size: 26px; text-align: center; color: #333; line-height: 2em;}
+.sansserif  {font-family: 'Questrial'; font-size: 20px; font-weight: 100;}
 
-#bottom {width: 100%; float: left; margin: 20px 0px 0px 0px;}
+#bottom   {width: 100%; float: left; margin: 20px 0px 0px 0px;}
 #bottom p {font-family: Garamond; font-size: 14px; text-align: center; color: #333;}
-a {color: #766625; text-decoration: none; padding-bottom: 2px; border-bottom: 1px dotted #766625; font-family: 'Raleway'; font-weight: 100; font-size: 12px;}
-a:hover {color: #d0b854;}
+
 </style>
 </head>
 <body>
@@ -56,6 +61,7 @@ a:hover {color: #d0b854;}
         </g>
         </svg>
       </div>
+      
       <div id="left">
         <div class="fromfile"></div>
         <div class="rollingpin"></div>
@@ -65,9 +71,12 @@ a:hover {color: #d0b854;}
       <div id="right">
         <p>Drag and Drop a <span class="sansserif">.shp</span> file anywhere on the screen and get a fresh <span class="sansserif">.csv</span>.</p>
         <p>Use all the datas!</p>
-        
       </div>
-      <div id="bottom"><p>Made fresh for you by <a href="#">@maxogden</a> + <a href="#">@jllord</a>. Here's the <a href="#">github</a>.<p></div>
+      
+      <div id="bottom">
+        <p>Made fresh for you by <a href="http://www.twitter.com/maxogden" target="_blank">@maxogden</a> + <a href="http://www.twitter.com/jllord" target="_blank">@jllord</a>. Here's the <a href="https://github.com/maxogden/dataroller" target="_blank">github</a>.<p>
+      </div>
+      
       </div>
     </div>
 </body>
