@@ -1,0 +1,8 @@
+{
+  "name": "dataroller",
+  "version": "0.0.1",
+  "dependencies": {
+    "shp2json": "0.1.2",
+    "JSONStream": "0.2.2"
+  }
+}
