@@ -4,46 +4,90 @@ var request = require('request')
 var filestream = require('domnode-filestream')
 var url = require('url')
 
-// needed until request browserify gets fixed
-XMLHttpRequest.prototype.sendAsBinary = function(datastr) {
-  function byteValue(x) {
-      return x.charCodeAt(0) & 0xff;
-  }
-  var ords = Array.prototype.map.call(datastr, byteValue);
-  var ui8a = new Uint8Array(ords);
-  this.send(ui8a.buffer);
-}
-
 function dropHandler(e) {
-
-  e.stopPropagation();
-  e.preventDefault();
-
+  e.stopPropagation()
+  e.preventDefault()
+  document.querySelector('.errors').innerHTML = ''
+  
   var fileList = e.dataTransfer.files
-
   var fstream = filestream( fileList, 'binary' )
-  // var binaryConverter = new FileToBinary()
+  var binaryConverter = new FileToBinary()
   fsstream = new FSStream()
   
   var currentURL = url.parse(window.location.href)
   currentURL.pathname = "/upload"
   var uploadURL = url.format(currentURL)
+  var upload = request.post(uploadURL)
+  bindUploadEvents(upload)
+  upload.on('response', function(resp) {
+    if (resp.statusCode === 500) {
+      outputFile.hasErrors = true
+      document.querySelector('.errors').innerHTML = 'error processing shapefile. please drop a valid .zip archive of a shapefile'
+    }
+  })
+  
   var outputFile = new FileSave('shapefile.csv')
-  fstream.pipe(fsstream).pipe(request.post(uploadURL)).pipe(outputFile)
+  outputFile.on('end', resetUploadState)
+  
+  fstream.pipe(fsstream).pipe(binaryConverter).pipe(upload).pipe(outputFile)
+}
+
+function resetUploadState() {
+  document.querySelector('.messages').style.display = 'none'
+  document.querySelector('.progress').style.display = 'none'
+}
+
+function bindUploadEvents(upload) {
+  var progressBar = document.querySelector('.progress')
+  upload.on('request', function() {
+    monitorProgress(upload)
+  })
+  upload.on('uploadProgress', function(percent) {
+    progressBar.style.display = "block"
+    progressBar.value = percent
+    progressBar.textContent = percent // xbrowser
+  })
+  upload.on('uploadComplete', function() {
+    document.querySelector('.messages').style.display = 'block'
+  })
+}
+
+function monitorProgress(upload) {
+  upload.req.xhr.upload.onprogress = function(e) {
+    emitProgressEvents(upload, e, 'upload')
+  }
+  upload.req.xhr.onprogress = function(e) {
+    emitProgressEvents(upload, e, 'download')
+  }
+}
+
+function emitProgressEvents(req, xhrProgress, type) {
+  var percent = percentage(xhrProgress)
+  req.emit(type + 'Progress', percent)
+  if (percent === 100) req.emit(type + 'Complete')
+}
+
+function percentage(progressEvent) {
+  if (progressEvent.lengthComputable) return (progressEvent.loaded / progressEvent.total) * 100
 }
 
 document.addEventListener('dragover', function(e){
-  e.preventDefault();
-  e.stopPropagation();
-}, false);
+  e.preventDefault()
+  e.stopPropagation()
+  document.body.style['border-color'] = 'salmon'
+}, false)
 
-document.addEventListener('drop', dropHandler, false);
+document.addEventListener('dragleave', function(e){
+  document.body.style['border-color'] = '#ACACAC'
+}, false)
+
+document.addEventListener('drop', dropHandler, false)
 
 function FSStream() {
-  var me = this;
-  stream.Stream.call(me);
-  me.writable = true;
-  me.readable = true;
+  var me = this
+  stream.Stream.call(me)
+  me.writable = true
+  me.readable = true
   this.loaded = 0
 }
 
@@ -54,12 +98,12 @@ FSStream.prototype.write = function(data) {
   this.emit('data', data.target.result.slice(this.loaded))
   this.loaded = data.loaded
   return true
-};
+}
 
 FSStream.prototype.end = function(){
   this.emit('end')
   return true
-};
+}
 
 // http://javascript0.org/wiki/Portable_sendAsBinary
 function FileToBinary() {
@@ -85,6 +129,7 @@ function FileSave(filename) {
   this.filename = filename || 'file'
   this.blobBuilder = new BlobBuilder()
   this.writable = true
+  this.hasErrors = false
 }
 
 util.inherits(FileSave, stream.Stream)
@@ -93,6 +138,7 @@ FileSave.prototype.write = function(chunk) {
   this.blobBuilder.append(chunk)
 }
 
-FileSave.prototype.end = function() { 
-  saveAs(this.blobBuilder.getBlob("text/plain;charset=utf-8"), this.filename)
+FileSave.prototype.end = function() {
+  if (!this.hasErrors) saveAs(this.blobBuilder.getBlob("text/plain;charset=utf-8"), this.filename)
+  this.emit('end')
 }

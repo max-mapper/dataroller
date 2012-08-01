@@ -28,13 +28,16 @@ a:hover {color: #d0b854; border-bottom: 1px dotted #d0b854;}
 #bottom   {width: 100%; float: left; margin: 20px 0px 0px 0px;}
 #bottom p {font-family: Garamond; font-size: 14px; text-align: center; color: #333;}
 
+progress { display: none; width: 100%; }
+.messages { display: none; margin-top: 10px; }
+.errors { margin: 5px 0; }
+.loader { background: url('spinner.gif') no-repeat 0 0; width: 64px; height: 64px; margin: 10px 0; }
+
 </style>
 </head>
 <body>
   <div id="wrapper">
     <div id="content">
-    
-    
       <div id="top">
         <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
         	 width="289.64px" height="30.823px" viewBox="0 0 289.64 30.823" enable-background="new 0 0 289.64 30.823" xml:space="preserve">
@@ -69,8 +72,13 @@ a:hover {color: #d0b854; border-bottom: 1px dotted #d0b854;}
       </div>
       
       <div id="right">
-        <p>Drag and Drop a <span class="sansserif">.shp</span> file anywhere on the screen and get a fresh <span class="sansserif">.csv</span>.</p>
-        <p>Use all the datas!</p>
+        <p>Drag and Drop a <span class="sansserif">.shp</span> file anywhere on the screen to get a fresh <span class="sansserif">.csv</span>.</p>
+        <progress class="progress" min="0" max="100" value="0">0% complete</progress>
+        <div class="messages">
+          done uploading! please wait while we convert your file
+          <div class="loader"></div>
+        </div>
+        <div class="errors"></div>
       </div>
       
       <div id="bottom">

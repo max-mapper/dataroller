@@ -7,7 +7,7 @@
     var cached = require.cache[resolved];
     var res = cached? cached.exports : mod();
     return res;
-}
+};
 
 require.paths = [];
 require.modules = {};
@@ -151,7 +151,14 @@ require.alias = function (from, to) {
         ;
         
         var require_ = function (file) {
-            return require(file, dirname);
+            var requiredModule = require(file, dirname);
+            var cached = require.cache[require.resolve(file, dirname)];
+
+            if (cached.parent === null) {
+                cached.parent = module_;
+            }
+
+            return requiredModule;
         };
         require_.resolve = function (name) {
             return require.resolve(name, dirname);
@@ -159,7 +166,13 @@ require.alias = function (from, to) {
         require_.modules = require.modules;
         require_.define = require.define;
         require_.cache = require.cache;
-        var module_ = { exports : {} };
+        var module_ = {
+            id : filename,
+            filename: filename,
+            exports : {},
+            loaded : false,
+            parent: null
+        };
         
         require.modules[filename] = function () {
             require.cache[filename] = module_;
@@ -172,6 +185,7 @@ require.alias = function (from, to) {
                 filename,
                 process
             );
+            module_.loaded = true;
             return module_.exports;
         };
     };
@@ -2021,7 +2035,7 @@ var Response = require('./response');
 var Request = module.exports = function (xhr, params) {
     var self = this;
     self.xhr = xhr;
-    self.body = '';
+    self.body = [];
     
     var uri = params.host + ':' + params.port + (params.path || '/');
     
@@ -2069,12 +2083,26 @@ Request.prototype.setHeader = function (key, value) {
 };
 
 Request.prototype.write = function (s) {
-    this.body += s;
+    this.body.push(s);
+};
+
+Request.prototype.getBody = function () {
+  if (this.body.length === 0) return;
+  if (typeof(this.body[0]) === "string") return this.body.join('');
+  if (this.body[0].toString().match(/Array/)) {
+      var first = false;
+      this.body.forEach(function(ary) {
+          if (!first) return first = ary;
+          first.concat(ary);
+      })
+      return first;
+  }
+  return this.body;
 };
 
 Request.prototype.end = function (s) {
     if (s !== undefined) this.write(s);
-    this.xhr.sendAsBinary(this.body);
+    this.xhr.send(this.getBody());
 };
 
 // Taken from http://dxr.mozilla.org/mozilla/mozilla-central/content/base/src/nsXMLHttpRequest.cpp.html
@@ -4391,7 +4419,11 @@ assert.doesNotThrow = function(block, /*optional*/error, /*optional*/message) {
 assert.ifError = function(err) { if (err) {throw err;}};
 });
 
-require.define("buffer",function(require,module,exports,__dirname,__filename,process){function SlowBuffer (size) {
+require.define("buffer",function(require,module,exports,__dirname,__filename,process){module.exports = require("buffer-browserify")});
+
+require.define("/node_modules/buffer-browserify/package.json",function(require,module,exports,__dirname,__filename,process){module.exports = {"main":"index.js","browserify":"index.js"}});
+
+require.define("/node_modules/buffer-browserify/index.js",function(require,module,exports,__dirname,__filename,process){function SlowBuffer (size) {
     this.length = size;
 };
 
@@ -4405,6 +4437,118 @@ function toHex(n) {
   return n.toString(16);
 }
 
+function utf8ToBytes(str) {
+  var byteArray = [];
+  for (var i = 0; i < str.length; i++)
+    if (str.charCodeAt(i) <= 0x7F)
+      byteArray.push(str.charCodeAt(i));
+    else {
+      var h = encodeURIComponent(str.charAt(i)).substr(1).split('%');
+      for (var j = 0; j < h.length; j++)
+        byteArray.push(parseInt(h[j], 16));
+    }
+
+  return byteArray;
+}
+
+function asciiToBytes(str) {
+  var byteArray = []
+  for (var i = 0; i < str.length; i++ )
+    // Node's code seems to be doing this and not & 0x7F..
+    byteArray.push( str.charCodeAt(i) & 0xFF );
+
+  return byteArray;
+}
+
+function base64ToBytes(str) {
+  return require("base64-js").toByteArray(str);
+}
+
+SlowBuffer.byteLength = function (str, encoding) {
+  switch (encoding || "utf8") {
+    case 'hex':
+      return str.length / 2;
+
+    case 'utf8':
+    case 'utf-8':
+      return utf8ToBytes(str).length;
+
+    case 'ascii':
+      return str.length;
+
+    case 'base64':
+      return base64ToBytes(str).length;
+
+    default:
+      throw new Error('Unknown encoding');
+  }
+};
+
+function blitBuffer(src, dst, offset, length) {
+  var pos, i = 0;
+  while (i < length) {
+    if ((i+offset >= dst.length) || (i >= src.length))
+      break;
+
+    dst[i + offset] = src[i];
+    i++;
+  }
+  return i;
+}
+
+SlowBuffer.prototype.utf8Write = function (string, offset, length) {
+  var bytes, pos;
+  return SlowBuffer._charsWritten =  blitBuffer(utf8ToBytes(string), this, offset, length);
+};
+
+SlowBuffer.prototype.asciiWrite = function (string, offset, length) {
+  var bytes, pos;
+  return SlowBuffer._charsWritten =  blitBuffer(asciiToBytes(string), this, offset, length);
+};
+
+SlowBuffer.prototype.base64Write = function (string, offset, length) {
+  var bytes, pos;
+  return SlowBuffer._charsWritten = blitBuffer(base64ToBytes(string), this, offset, length);
+};
+
+SlowBuffer.prototype.base64Slice = function (start, end) {
+  var bytes = Array.prototype.slice.apply(this, arguments)
+  return require("base64-js").fromByteArray(bytes);
+}
+
+function decodeUtf8Char(str) {
+  try {
+    return decodeURIComponent(str);
+  } catch (err) {
+    return String.fromCharCode(0xFFFD); // UTF 8 invalid char
+  }
+}
+
+SlowBuffer.prototype.utf8Slice = function () {
+  var bytes = Array.prototype.slice.apply(this, arguments);
+  var res = "";
+  var tmp = "";
+  var i = 0;
+  while (i < bytes.length) {
+    if (bytes[i] <= 0x7F) {
+      res += decodeUtf8Char(tmp) + String.fromCharCode(bytes[i]);
+      tmp = "";
+    } else
+      tmp += "%" + bytes[i].toString(16);
+
+    i++;
+  }
+
+  return res + decodeUtf8Char(tmp);
+}
+
+SlowBuffer.prototype.asciiSlice = function () {
+  var bytes = Array.prototype.slice.apply(this, arguments);
+  var ret = "";
+  for (var i = 0; i < bytes.length; i++)
+    ret += String.fromCharCode(bytes[i]);
+  return ret;
+}
 
 SlowBuffer.prototype.inspect = function() {
   var out = [],
@@ -5141,7 +5285,7 @@ function readFloat(buffer, offset, isBigEndian, noAssert) {
         'Trying to read beyond buffer length');
   }
 
-  return require('buffer_ieee754').readIEEE754(buffer, offset, isBigEndian,
+  return require('./buffer_ieee754').readIEEE754(buffer, offset, isBigEndian,
       23, 4);
 }
 
@@ -5162,7 +5306,7 @@ function readDouble(buffer, offset, isBigEndian, noAssert) {
         'Trying to read beyond buffer length');
   }
 
-  return require('buffer_ieee754').readIEEE754(buffer, offset, isBigEndian,
+  return require('./buffer_ieee754').readIEEE754(buffer, offset, isBigEndian,
       52, 8);
 }
 
@@ -5452,7 +5596,7 @@ function writeFloat(buffer, value, offset, isBigEndian, noAssert) {
     verifIEEE754(value, 3.4028234663852886e+38, -3.4028234663852886e+38);
   }
 
-  require('buffer_ieee754').writeIEEE754(buffer, value, offset, isBigEndian,
+  require('./buffer_ieee754').writeIEEE754(buffer, value, offset, isBigEndian,
       23, 4);
 }
 
@@ -5481,7 +5625,7 @@ function writeDouble(buffer, value, offset, isBigEndian, noAssert) {
     verifIEEE754(value, 1.7976931348623157E+308, -1.7976931348623157E+308);
   }
 
-  require('buffer_ieee754').writeIEEE754(buffer, value, offset, isBigEndian,
+  require('./buffer_ieee754').writeIEEE754(buffer, value, offset, isBigEndian,
       52, 8);
 }
 
@@ -5523,7 +5667,95 @@ SlowBuffer.prototype.writeDoubleLE = Buffer.prototype.writeDoubleLE;
 SlowBuffer.prototype.writeDoubleBE = Buffer.prototype.writeDoubleBE;
 });
 
-require.define("buffer_ieee754",function(require,module,exports,__dirname,__filename,process){exports.readIEEE754 = function(buffer, offset, isBE, mLen, nBytes) {
+require.define("/node_modules/buffer-browserify/node_modules/base64-js/package.json",function(require,module,exports,__dirname,__filename,process){module.exports = {"main":"lib/b64.js"}});
+
+require.define("/node_modules/buffer-browserify/node_modules/base64-js/lib/b64.js",function(require,module,exports,__dirname,__filename,process){(function (exports) {
+	'use strict';
+
+	var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+	function b64ToByteArray(b64) {
+		var i, j, l, tmp, placeHolders, arr;
+	
+		if (b64.length % 4 > 0) {
+			throw 'Invalid string. Length must be a multiple of 4';
+		}
+
+		// the number of equal signs (place holders)
+		// if there are two placeholders, than the two characters before it
+		// represent one byte
+		// if there is only one, then the three characters before it represent 2 bytes
+		// this is just a cheap hack to not do indexOf twice
+		placeHolders = b64.indexOf('=');
+		placeHolders = placeHolders > 0 ? b64.length - placeHolders : 0;
+
+		// base64 is 4/3 + up to two characters of the original data
+		arr = [];//new Uint8Array(b64.length * 3 / 4 - placeHolders);
+
+		// if there are placeholders, only get up to the last complete 4 chars
+		l = placeHolders > 0 ? b64.length - 4 : b64.length;
+
+		for (i = 0, j = 0; i < l; i += 4, j += 3) {
+			tmp = (lookup.indexOf(b64[i]) << 18) | (lookup.indexOf(b64[i + 1]) << 12) | (lookup.indexOf(b64[i + 2]) << 6) | lookup.indexOf(b64[i + 3]);
+			arr.push((tmp & 0xFF0000) >> 16);
+			arr.push((tmp & 0xFF00) >> 8);
+			arr.push(tmp & 0xFF);
+		}
+
+		if (placeHolders === 2) {
+			tmp = (lookup.indexOf(b64[i]) << 2) | (lookup.indexOf(b64[i + 1]) >> 4);
+			arr.push(tmp & 0xFF);
+		} else if (placeHolders === 1) {
+			tmp = (lookup.indexOf(b64[i]) << 10) | (lookup.indexOf(b64[i + 1]) << 4) | (lookup.indexOf(b64[i + 2]) >> 2);
+			arr.push((tmp >> 8) & 0xFF);
+			arr.push(tmp & 0xFF);
+		}
+
+		return arr;
+	}
+
+	function uint8ToBase64(uint8) {
+		var i,
+			extraBytes = uint8.length % 3, // if we have 1 byte left, pad 2 bytes
+			output = "",
+			temp, length;
+
+		function tripletToBase64 (num) {
+			return lookup[num >> 18 & 0x3F] + lookup[num >> 12 & 0x3F] + lookup[num >> 6 & 0x3F] + lookup[num & 0x3F];
+		};
+
+		// go through the array every three bytes, we'll deal with trailing stuff later
+		for (i = 0, length = uint8.length - extraBytes; i < length; i += 3) {
+			temp = (uint8[i] << 16) + (uint8[i + 1] << 8) + (uint8[i + 2]);
+			output += tripletToBase64(temp);
+		}
+
+		// pad the end with zeros, but make sure to not forget the extra bytes
+		switch (extraBytes) {
+			case 1:
+				temp = uint8[uint8.length - 1];
+				output += lookup[temp >> 2];
+				output += lookup[(temp << 4) & 0x3F];
+				output += '==';
+				break;
+			case 2:
+				temp = (uint8[uint8.length - 2] << 8) + (uint8[uint8.length - 1]);
+				output += lookup[temp >> 10];
+				output += lookup[(temp >> 4) & 0x3F];
+				output += lookup[(temp << 2) & 0x3F];
+				output += '=';
+				break;
+		}
+
+		return output;
+	}
+
+	module.exports.toByteArray = b64ToByteArray;
+	module.exports.fromByteArray = uint8ToBase64;
+}());
+});
+
+require.define("/node_modules/buffer-browserify/buffer_ieee754.js",function(require,module,exports,__dirname,__filename,process){exports.readIEEE754 = function(buffer, offset, isBE, mLen, nBytes) {
   var e, m,
       eLen = nBytes * 8 - mLen - 1,
       eMax = (1 << eLen) - 1,
@@ -5942,46 +6174,90 @@ var request = require('request')
 var filestream = require('domnode-filestream')
 var url = require('url')
 
-// needed until request browserify gets fixed
-XMLHttpRequest.prototype.sendAsBinary = function(datastr) {
-  function byteValue(x) {
-      return x.charCodeAt(0) & 0xff;
-  }
-  var ords = Array.prototype.map.call(datastr, byteValue);
-  var ui8a = new Uint8Array(ords);
-  this.send(ui8a.buffer);
-}
-
 function dropHandler(e) {
-
-  e.stopPropagation();
-  e.preventDefault();
-
+  e.stopPropagation()
+  e.preventDefault()
+  document.querySelector('.errors').innerHTML = ''
+  
   var fileList = e.dataTransfer.files
-
   var fstream = filestream( fileList, 'binary' )
-  // var binaryConverter = new FileToBinary()
+  var binaryConverter = new FileToBinary()
   fsstream = new FSStream()
   
   var currentURL = url.parse(window.location.href)
   currentURL.pathname = "/upload"
   var uploadURL = url.format(currentURL)
+  var upload = request.post(uploadURL)
+  bindUploadEvents(upload)
+  upload.on('response', function(resp) {
+    if (resp.statusCode === 500) {
+      outputFile.hasErrors = true
+      document.querySelector('.errors').innerHTML = 'error processing shapefile. please drop a valid .zip archive of a shapefile'
+    }
+  })
+  
   var outputFile = new FileSave('shapefile.csv')
-  fstream.pipe(fsstream).pipe(request.post(uploadURL)).pipe(outputFile)
+  outputFile.on('end', resetUploadState)
+  
+  fstream.pipe(fsstream).pipe(binaryConverter).pipe(upload).pipe(outputFile)
+}
+
+function resetUploadState() {
+  document.querySelector('.messages').style.display = 'none'
+  document.querySelector('.progress').style.display = 'none'
+}
+
+function bindUploadEvents(upload) {
+  var progressBar = document.querySelector('.progress')
+  upload.on('request', function() {
+    monitorProgress(upload)
+  })
+  upload.on('uploadProgress', function(percent) {
+    progressBar.style.display = "block"
+    progressBar.value = percent
+    progressBar.textContent = percent // xbrowser
+  })
+  upload.on('uploadComplete', function() {
+    document.querySelector('.messages').style.display = 'block'
+  })
+}
+
+function monitorProgress(upload) {
+  upload.req.xhr.upload.onprogress = function(e) {
+    emitProgressEvents(upload, e, 'upload')
+  }
+  upload.req.xhr.onprogress = function(e) {
+    emitProgressEvents(upload, e, 'download')
+  }
+}
+
+function emitProgressEvents(req, xhrProgress, type) {
+  var percent = percentage(xhrProgress)
+  req.emit(type + 'Progress', percent)
+  if (percent === 100) req.emit(type + 'Complete')
+}
+
+function percentage(progressEvent) {
+  if (progressEvent.lengthComputable) return (progressEvent.loaded / progressEvent.total) * 100
 }
 
 document.addEventListener('dragover', function(e){
-  e.preventDefault();
-  e.stopPropagation();
-}, false);
+  e.preventDefault()
+  e.stopPropagation()
+  document.body.style['border-color'] = 'salmon'
+}, false)
 
-document.addEventListener('drop', dropHandler, false);
+document.addEventListener('dragleave', function(e){
+  document.body.style['border-color'] = '#ACACAC'
+}, false)
+
+document.addEventListener('drop', dropHandler, false)
 
 function FSStream() {
-  var me = this;
-  stream.Stream.call(me);
-  me.writable = true;
-  me.readable = true;
+  var me = this
+  stream.Stream.call(me)
+  me.writable = true
+  me.readable = true
   this.loaded = 0
 }
 
@@ -5992,12 +6268,12 @@ FSStream.prototype.write = function(data) {
   this.emit('data', data.target.result.slice(this.loaded))
   this.loaded = data.loaded
   return true
-};
+}
 
 FSStream.prototype.end = function(){
   this.emit('end')
   return true
-};
+}
 
 // http://javascript0.org/wiki/Portable_sendAsBinary
 function FileToBinary() {
@@ -6023,6 +6299,7 @@ function FileSave(filename) {
   this.filename = filename || 'file'
   this.blobBuilder = new BlobBuilder()
   this.writable = true
+  this.hasErrors = false
 }
 
 util.inherits(FileSave, stream.Stream)
@@ -6031,8 +6308,9 @@ FileSave.prototype.write = function(chunk) {
   this.blobBuilder.append(chunk)
 }
 
-FileSave.prototype.end = function() { 
-  saveAs(this.blobBuilder.getBlob("text/plain;charset=utf-8"), this.filename)
+FileSave.prototype.end = function() {
+  if (!this.hasErrors) saveAs(this.blobBuilder.getBlob("text/plain;charset=utf-8"), this.filename)
+  this.emit('end')
 }
 });
 require("/attachments/drophandler.js");
