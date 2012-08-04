@@ -41,7 +41,8 @@ function createCSVs(dbfile, cb) {
     var files = {}
     tables.forEach(function(table) {
       db.toCSV(table, function(err, csv) {
-        files[table] = csv
+        var filename = sanitizeFilename(table) + '.csv'
+        files[filename] = csv
         if (Object.keys(files).length === tables.length) cb(false, files)
       })
     })
