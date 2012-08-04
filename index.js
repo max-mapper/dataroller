@@ -40,7 +40,7 @@ function createCSVs(dbfile, cb) {
     if (err) return console.log(err)
     var files = {}
     tables.forEach(function(table) {
-      fruit.toCSV(table, function(err, csv) {
+      db.toCSV(table, function(err, csv) {
         files[table] = csv
         if (Object.keys(files).length === tables.length) cb(false, files)
       })

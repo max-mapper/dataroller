@@ -6270,7 +6270,6 @@ function dropHandler(e) {
     var ext = extensions[contentType]
     var outputFile = new FileSave('converted' + ext, contentType)
     outputFile.on('end', resetUploadState)
-    upload.on('data', function(c) { console.log('d chunk', c) })
     upload.pipe(new FileToBinary()).pipe(outputFile)
   })
   
@@ -6361,7 +6360,6 @@ util.inherits(FileToBinary, stream.Stream)
 FileToBinary.prototype.write = function(chunk) {
   var ords = Array.prototype.map.call(chunk, this.byteValue)
   var ui8a = new Uint8Array(ords)
-  console.log(ords, ui8a)
   this.emit('data', ui8a.buffer)
 }
 
