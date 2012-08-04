@@ -125,26 +125,41 @@ JSONToCSV.prototype.objectToRow = function(obj) {
     var val = obj.properties[header]
     if (val) {
       if (startedOutput) row += self.sep
-      if (typeof(val) == "object") val = JSON.stringify(val)
-      if (typeof(val) == "string") val = val.replace(/\"/g, '""')
-      row += "\"" + val + "\""
+      row += self.escapeCell(val)
     } else {
       if (startedOutput) row += self.sep
     } 
     startedOutput = true
   })
-  if (startedOutput) row += self.sep
+  if (obj.geometry.type === "Point") {
+    if (startedOutput) row += self.sep
+    row += self.escapeCell(obj.geometry.coordinates[1])
+    startedOutput = true
+    row += self.sep
+    row += self.escapeCell(obj.geometry.coordinates[0])
+    row += self.sep
+  }
   row += obj.geometry.type
   startedOutput = true
   row += self.sep
-  row += JSON.stringify(obj.geometry)
+  row += self.escapeCell(obj.geometry)
   row += self.lineSep
   return row
 }
 
+JSONToCSV.prototype.escapeCell = function(val) {
+  if (typeof(val) == "object") val = JSON.stringify(val)
+  if (typeof(val) == "string") val = val.replace(/\"/g, '""')
+  return "\"" + val + "\""
+}
+
 JSONToCSV.prototype.objectToHeaderRow = function(obj) {
   this.headers = Object.keys(obj.properties)
-  return this.headers.concat(['geometry', 'type']).join(this.sep) + this.lineSep
+  var extraRows = []
+  if (obj.geometry.type === "Point") {
+    extraRows = ['latitude', 'longitude']
+  }
+  return this.headers.concat(extraRows).concat(['geometry', 'type']).join(this.sep) + this.lineSep
 }
 
 JSONToCSV.prototype.write = function(obj) {
