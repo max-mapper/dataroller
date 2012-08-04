@@ -2227,7 +2227,9 @@ Response.prototype.handle = function (res) {
 Response.prototype.write = function (res) {
     var respBody = this.getResponse(res);
     if (respBody.toString().match(/ArrayBuffer/)) {
-        respBody = new Uint8Array(respBody);
+        this.emit('data', new Uint8Array(respBody, this.offset));
+        this.offset = respBody.byteLength;
+        return;
     }
     if (respBody.length > this.offset) {
         this.emit('data', respBody.slice(this.offset));
