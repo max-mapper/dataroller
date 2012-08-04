@@ -3,6 +3,7 @@ var fs = require('fs')
 var stream = require('stream')
 var util = require('util')
 var spawn = require('child_process').spawn
+var async = require('async')
 var shp2json = require('shp2json')
 var mdb = require('mdb')
 var JSONStream = require('JSONStream')
@@ -15,7 +16,6 @@ var server = http.createServer(function (req, res) {
 }).listen(8080)
 
 function handleUpload(req, res) {
-  res.setHeader('content-type', "text/csv")
   var ct = req.headers['content-type']
   if (!ct) return sendError(res, "content-type is required")
   ct = ct.toLowerCase()
@@ -24,34 +24,61 @@ function handleUpload(req, res) {
   return sendError(res, "content-type not supported")
 }
 
-function zipCSVs(tmpID) {
-  var ps = spawn('zip', [ '-r', tmpZip, csvFolder ]);
+function zipFolder(folder, res) {
+  var out = folder
+  var ps = spawn('zip', ['-rj', '-', folder])
   ps.on('exit', function (code) {
-    next(code < 3 ? null : 'error in unzip: code ' + code)
+    var err = code < 3 ? null : 'error in zip: code ' + code
+    if (err) return sendError(res, err)
   })
+  return ps.stdout
 }
 
-function createCSVs(tmpID) {
-  console.log('opening', tmpFolder + tmpID)
-  var db = mdb(tmpFolder + tmpID)
+function createCSVs(dbfile, cb) {
+  var db = mdb(dbfile)
   db.tables(function(err, tables) {
     if (err) return console.log(err)
-    console.log(tables)
+    var files = {}
     tables.forEach(function(table) {
       fruit.toCSV(table, function(err, csv) {
-        console.log(err, table, csv.split('\n').length - 1 + " lines")
+        files[table] = csv
+        if (Object.keys(files).length === tables.length) cb(false, files)
       })
     })
   })
 }
 
+function writeCSVs(folder, json, callback) {
+  var writes = Object.keys(json).map(function(key) {
+    return function(cb) {
+      var error = false
+      fs.writeFile(folder + '/' + key, json[key], cb)
+    }
+  })
+  async.parallel(writes, callback)
+}
+
+function sanitizeFilename(filename) {
+  return filename.replace(/[\\\/:\*\?""'<>|]/ig, "")
+}
 
 function handleAccess(req, res) {
   var id = +new Date() + Math.floor(Math.random() * 999999)
-  req.pipe(fs.createWriteStream(tmpFolder + id))
-    .on('end', function() {
-      createCSVs(id, function(err, csvPath) {
-        zipFolder(id).pipe(res)
+  var dbfile = tmpFolder + id + '.db'
+  var csvFolder = tmpFolder + id
+  var write = fs.createWriteStream(dbfile)
+  req.pipe(write)
+  write
+    .on('close', function() {
+      fs.mkdir(csvFolder, function(err) {
+        if (err) return sendError(res, err)
+        createCSVs(dbfile, function(err, csvs) {
+          writeCSVs(csvFolder, csvs, function(err) {
+            if (err) return sendError(res, err)
+            res.setHeader('content-type', "application/zip")
+            zipFolder(csvFolder, res).pipe(res)
+          })
+        })
       })
     })
     .on('error', function() {
@@ -60,12 +87,12 @@ function handleAccess(req, res) {
 }
 
 function sendError(res, msg) {
-  res.setHeader('content-type', 'text/plain')
   res.statusCode = 500
   res.end(msg + '\n')
 }
 
 function handleShapefile(req, res) {
+  res.setHeader('content-type', "text/csv")
   var start = new Date()
   var shpStream = shp2json(req)
   var geoJSONParser = JSONStream.parse(['features', /./])

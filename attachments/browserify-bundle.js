@@ -2031,11 +2031,12 @@ var xhrHttp = (function () {
 
 require.define("/node_modules/http-browserify/lib/request.js",function(require,module,exports,__dirname,__filename,process){var EventEmitter = require('events').EventEmitter;
 var Response = require('./response');
+var concatStream = require('concat-stream')
 
 var Request = module.exports = function (xhr, params) {
     var self = this;
     self.xhr = xhr;
-    self.body = [];
+    self.body = concatStream()
     
     var uri = params.host + ':' + params.port + (params.path || '/');
     
@@ -2083,26 +2084,13 @@ Request.prototype.setHeader = function (key, value) {
 };
 
 Request.prototype.write = function (s) {
-    this.body.push(s);
-};
-
-Request.prototype.getBody = function () {
-  if (this.body.length === 0) return;
-  if (typeof(this.body[0]) === "string") return this.body.join('');
-  if (this.body[0].toString().match(/Array/)) {
-      var first = false;
-      this.body.forEach(function(ary) {
-          if (!first) return first = ary;
-          first.concat(ary);
-      })
-      return first;
-  }
-  return this.body;
+    this.body.write(s);
 };
 
 Request.prototype.end = function (s) {
-    if (s !== undefined) this.write(s);
-    this.xhr.send(this.getBody());
+    if (s !== undefined) this.body.write(s);
+    this.body.end()
+    this.xhr.send(this.body.getBody());
 };
 
 // Taken from http://dxr.mozilla.org/mozilla/mozilla-central/content/base/src/nsXMLHttpRequest.cpp.html
@@ -2180,6 +2168,13 @@ function parseHeaders (res) {
     return headers;
 }
 
+Response.prototype.getResponse = function (xhr) {
+    var respType = xhr.responseType.toLowerCase();
+    if (respType === "blob") return xhr.responseBlob;
+    if (respType === "arraybuffer") return xhr.response;
+    return xhr.responseText;
+}
+
 Response.prototype.getHeader = function (key) {
     return this.headers[key.toLowerCase()];
 };
@@ -2223,18 +2218,75 @@ Response.prototype.handle = function (res) {
         this.write(res);
         
         if (res.error) {
-            this.emit('error', res.responseText);
+            this.emit('error', this.getResponse(res));
         }
         else this.emit('end');
     }
 };
 
 Response.prototype.write = function (res) {
-    if (res.responseText.length > this.offset) {
-        this.emit('data', res.responseText.slice(this.offset));
-        this.offset = res.responseText.length;
+    var respBody = this.getResponse(res);
+    if (respBody.toString().match(/ArrayBuffer/)) {
+        var ui8a = new Uint8Array(respBody);
+        respBody = String.fromCharCode.apply(null, ui8a);
+    }
+    if (respBody.length > this.offset) {
+        this.emit('data', respBody.slice(this.offset));
+        this.offset = respBody.length;
     }
 };
+});
+
+require.define("/node_modules/http-browserify/node_modules/concat-stream/package.json",function(require,module,exports,__dirname,__filename,process){module.exports = {}});
+
+require.define("/node_modules/http-browserify/node_modules/concat-stream/index.js",function(require,module,exports,__dirname,__filename,process){var stream = require('stream')
+var util = require('util')
+
+function ConcatStream(cb) {
+  stream.Stream.call(this)
+  this.writable = true
+  if (cb) this.cb = cb
+  this.body = []
+  if (this.cb) this.on('error', cb)
+}
+
+util.inherits(ConcatStream, stream.Stream)
+
+ConcatStream.prototype.write = function(chunk) {
+  this.body.push(chunk)
+}
+
+ConcatStream.prototype.arrayConcat = function(arrs) {
+  if (arrs.length === 0) return []
+  if (arrs.length === 1) return arrs[0]
+  return arrs.reduce(function (a, b) { return a.concat(b) })
+}
+
+ConcatStream.prototype.isArray = function(arr) {
+  var isArray = Array.isArray(arr)
+  var isTypedArray = arr.toString().match(/Array/)
+  return isArray || isTypedArray
+}
+
+ConcatStream.prototype.getBody = function () {
+  if (this.body.length === 0) return
+  if (typeof(this.body[0]) === "string") return this.body.join('')
+  if (this.isArray(this.body[0])) return this.arrayConcat(this.body)
+  if (typeof(Buffer) !== "undefined" && Buffer.isBuffer(this.body[0])) {
+    return Buffer.concat(this.body)
+  }
+  return this.body
+}
+
+ConcatStream.prototype.end = function() {
+  if (this.cb) this.cb(false, this.getBody())
+}
+
+module.exports = function(cb) {
+  return new ConcatStream(cb)
+}
+
+module.exports.ConcatStream = ConcatStream
 });
 
 require.define("url",function(require,module,exports,__dirname,__filename,process){var punycode = { encode : function (s) { return s } };
@@ -6181,6 +6233,11 @@ var contentTypes = {
   ".zip": "application/zip"
 }
 
+var extensions = {
+  "application/zip": ".zip",
+  "text/csv": ".csv"
+}
+
 function dropHandler(e) {
   e.stopPropagation()
   e.preventDefault()
@@ -6199,19 +6256,25 @@ function dropHandler(e) {
   var currentURL = url.parse(window.location.href)
   currentURL.pathname = "/"
   var uploadURL = url.format(currentURL)
-  var upload = request.post({uri: uploadURL, headers: {"content-type": mime, accept: 'text/csv'}})
+  window.upload = request.post({uri: uploadURL, headers: {"content-type": mime, accept: 'text/csv'}})
+  upload.on('request', function() {
+    upload.req.xhr.responseType = "arraybuffer"
+  })
   bindUploadEvents(upload)
   upload.on('response', function(resp) {
     if (resp.statusCode === 500) {
-      outputFile.hasErrors = true
-      document.querySelector('.errors').innerHTML = 'error processing shapefile. please drop a valid .zip archive of a shapefile'
+      var err = 'error processing shapefile. please drop a valid .zip archive of a shapefile'
+      return document.querySelector('.errors').innerHTML = err
     }
+    var contentType = resp.headers['content-type']
+    var ext = extensions[contentType]
+    var outputFile = new FileSave('converted' + ext, contentType)
+    outputFile.on('end', resetUploadState)
+    upload.on('data', function(c) { console.log('d chunk', c) })
+    upload.pipe(new FileToBinary()).pipe(outputFile)
   })
   
-  var outputFile = new FileSave('shapefile.csv')
-  outputFile.on('end', resetUploadState)
-  
-  fstream.pipe(fsstream).pipe(binaryConverter).pipe(upload).pipe(outputFile)
+  fstream.pipe(fsstream).pipe(binaryConverter).pipe(upload)
 }
 
 function resetUploadState() {
@@ -6298,6 +6361,7 @@ util.inherits(FileToBinary, stream.Stream)
 FileToBinary.prototype.write = function(chunk) {
   var ords = Array.prototype.map.call(chunk, this.byteValue)
   var ui8a = new Uint8Array(ords)
+  console.log(ords, ui8a)
   this.emit('data', ui8a.buffer)
 }
 
@@ -6307,12 +6371,12 @@ FileToBinary.prototype.byteValue = function(x) {
  
 FileToBinary.prototype.end = function(chunk) { this.emit('end') }
 
-function FileSave(filename) {
+function FileSave(filename, contentType) {
   stream.Stream.call(this)
+  this.contentType = contentType || 'text/plain;charset=utf-8'
   this.filename = filename || 'file'
   this.blobBuilder = new BlobBuilder()
   this.writable = true
-  this.hasErrors = false
 }
 
 util.inherits(FileSave, stream.Stream)
@@ -6322,7 +6386,7 @@ FileSave.prototype.write = function(chunk) {
 }
 
 FileSave.prototype.end = function() {
-  if (!this.hasErrors) saveAs(this.blobBuilder.getBlob("text/plain;charset=utf-8"), this.filename)
+  saveAs(this.blobBuilder.getBlob(this.contentType), this.filename)
   this.emit('end')
 }
 });

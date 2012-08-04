@@ -11,6 +11,11 @@ var contentTypes = {
   ".zip": "application/zip"
 }
 
+var extensions = {
+  "application/zip": ".zip",
+  "text/csv": ".csv"
+}
+
 function dropHandler(e) {
   e.stopPropagation()
   e.preventDefault()
@@ -29,19 +34,25 @@ function dropHandler(e) {
   var currentURL = url.parse(window.location.href)
   currentURL.pathname = "/"
   var uploadURL = url.format(currentURL)
-  var upload = request.post({uri: uploadURL, headers: {"content-type": mime, accept: 'text/csv'}})
+  window.upload = request.post({uri: uploadURL, headers: {"content-type": mime, accept: 'text/csv'}})
+  upload.on('request', function() {
+    upload.req.xhr.responseType = "arraybuffer"
+  })
   bindUploadEvents(upload)
   upload.on('response', function(resp) {
     if (resp.statusCode === 500) {
-      outputFile.hasErrors = true
-      document.querySelector('.errors').innerHTML = 'error processing shapefile. please drop a valid .zip archive of a shapefile'
+      var err = 'error processing shapefile. please drop a valid .zip archive of a shapefile'
+      return document.querySelector('.errors').innerHTML = err
     }
+    var contentType = resp.headers['content-type']
+    var ext = extensions[contentType]
+    var outputFile = new FileSave('converted' + ext, contentType)
+    outputFile.on('end', resetUploadState)
+    upload.on('data', function(c) { console.log('d chunk', c) })
+    upload.pipe(new FileToBinary()).pipe(outputFile)
   })
   
-  var outputFile = new FileSave('shapefile.csv')
-  outputFile.on('end', resetUploadState)
-  
-  fstream.pipe(fsstream).pipe(binaryConverter).pipe(upload).pipe(outputFile)
+  fstream.pipe(fsstream).pipe(binaryConverter).pipe(upload)
 }
 
 function resetUploadState() {
@@ -128,6 +139,7 @@ util.inherits(FileToBinary, stream.Stream)
 FileToBinary.prototype.write = function(chunk) {
   var ords = Array.prototype.map.call(chunk, this.byteValue)
   var ui8a = new Uint8Array(ords)
+  console.log(ords, ui8a)
   this.emit('data', ui8a.buffer)
 }
 
@@ -137,12 +149,12 @@ FileToBinary.prototype.byteValue = function(x) {
  
 FileToBinary.prototype.end = function(chunk) { this.emit('end') }
 
-function FileSave(filename) {
+function FileSave(filename, contentType) {
   stream.Stream.call(this)
+  this.contentType = contentType || 'text/plain;charset=utf-8'
   this.filename = filename || 'file'
   this.blobBuilder = new BlobBuilder()
   this.writable = true
-  this.hasErrors = false
 }
 
 util.inherits(FileSave, stream.Stream)
@@ -152,6 +164,6 @@ FileSave.prototype.write = function(chunk) {
 }
 
 FileSave.prototype.end = function() {
-  if (!this.hasErrors) saveAs(this.blobBuilder.getBlob("text/plain;charset=utf-8"), this.filename)
+  saveAs(this.blobBuilder.getBlob(this.contentType), this.filename)
   this.emit('end')
 }
