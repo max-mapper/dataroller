@@ -15,7 +15,6 @@ var server = http.createServer(function (req, res) {
 }).listen(8080)
 
 function handleUpload(req, res) {
-  var start = new Date
   res.setHeader('content-type', "text/csv")
   var ct = req.headers['content-type']
   if (!ct) return sendError(res, "content-type is required")
@@ -65,11 +64,12 @@ function sendError(res, msg) {
 }
 
 function handleShapefile(req, res) {
+  var start = new Date()
   var shpStream = shp2json(req)
   var geoJSONParser = JSONStream.parse(['features', /./])
   shpStream.on('error', function(err) { sendError(res, err) })
   shpStream.on('end', function() {
-    console.log((new Date - start) + 'ms')
+    console.log('shapefile', (new Date - start) + 'ms')
   })
   var csvStream = new JSONToCSV()
   shpStream.pipe(geoJSONParser).pipe(csvStream).pipe(res)
