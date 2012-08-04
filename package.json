@@ -6,6 +6,7 @@
     "JSONStream": "0.2.2",
     "domnode-filestream": "0.0.3",
     "request": "2.9.203",
-    "ecstatic": "0.1.6"
+    "ecstatic": "0.1.6",
+    "mdb": "0.0.6"
   }
 }

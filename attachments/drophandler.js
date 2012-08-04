@@ -1,23 +1,35 @@
 var util = require('util')
+var path = require('path')
 var stream = require('stream')
 var request = require('request')
 var filestream = require('domnode-filestream')
 var url = require('url')
+
+var contentTypes = {
+  ".mdb": "application/x-msaccess",
+  ".accdb": "application/x-msaccess",
+  ".zip": "application/zip"
+}
 
 function dropHandler(e) {
   e.stopPropagation()
   e.preventDefault()
   document.querySelector('.errors').innerHTML = ''
   
-  var fileList = e.dataTransfer.files
-  var fstream = filestream( fileList, 'binary' )
+  // TODO support multiple at a time
+  var file = e.dataTransfer.files[0]
+  var ext = path.extname(file.name)
+  var mime = contentTypes[ext]
+  if (!mime) return document.querySelector('.errors').innerHTML = 'only ' + Object.keys(contentTypes).join(', ') + ' supported'
+  
+  var fstream = filestream( file, 'binary' )
   var binaryConverter = new FileToBinary()
   fsstream = new FSStream()
   
   var currentURL = url.parse(window.location.href)
-  currentURL.pathname = "/upload"
+  currentURL.pathname = "/"
   var uploadURL = url.format(currentURL)
-  var upload = request.post(uploadURL)
+  var upload = request.post({uri: uploadURL, headers: {"content-type": mime, accept: 'text/csv'}})
   bindUploadEvents(upload)
   upload.on('response', function(resp) {
     if (resp.statusCode === 500) {
@@ -126,6 +138,7 @@ FileToBinary.prototype.byteValue = function(x) {
 FileToBinary.prototype.end = function(chunk) { this.emit('end') }
 
 function FileSave(filename) {
+  stream.Stream.call(me)
   this.filename = filename || 'file'
   this.blobBuilder = new BlobBuilder()
   this.writable = true

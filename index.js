@@ -2,26 +2,72 @@ var http = require('http')
 var fs = require('fs')
 var stream = require('stream')
 var util = require('util')
+var spawn = require('child_process').spawn
 var shp2json = require('shp2json')
+var mdb = require('mdb')
 var JSONStream = require('JSONStream')
 var ecstatic = require('ecstatic')(__dirname + '/attachments')
+var tmpFolder = '/tmp/'
 
 var server = http.createServer(function (req, res) {
-  if (req.url === '/upload') handleShapefileUpload(req, res)
+  if (req.method.toLowerCase() === 'post') handleUpload(req, res)
   else ecstatic(req, res)
 }).listen(8080)
 
-function handleShapefileUpload(req, res) {
+function handleUpload(req, res) {
   var start = new Date
   res.setHeader('content-type', "text/csv")
-  
+  var ct = req.headers['content-type']
+  if (!ct) return sendError(res, "content-type is required")
+  ct = ct.toLowerCase()
+  if (ct === "application/x-msaccess") return handleAccess(req, res)
+  if (ct === "application/zip") return handleShapefile(req, res)
+  return sendError(res, "content-type not supported")
+}
+
+function zipCSVs(tmpID) {
+  var ps = spawn('zip', [ '-r', tmpZip, csvFolder ]);
+  ps.on('exit', function (code) {
+    next(code < 3 ? null : 'error in unzip: code ' + code)
+  })
+}
+
+function createCSVs(tmpID) {
+  var db = mdb(tmpFolder + tmpID)
+  db.tables(function(err, tables) {
+    if (err) return console.log(err)
+    tables.forEach(function(table) {
+      fruit.toCSV(table, function(err, csv) {
+        console.log(err, table, csv.split('\n').length - 1 + " lines")
+      })
+    })
+  })
+}
+
+
+function handleAccess(req, res) {
+  var id = +new Date() + Math.floor(Math.random() * 999999)
+  req.pipe(fs.createWriteStream(tmpFolder + tmp))
+    .on('end', function() {
+      createCSVs(id, function(err, csvPath) {
+        zipFolder(id).pipe(res)
+      })
+    })
+    .on('error', function() {
+      resp.end('error', function(err) { sendError(res, err) })
+    })
+}
+
+function sendError(res, msg) {
+  res.setHeader('content-type', 'text/plain')
+  res.statusCode = 500
+  res.end(msg + '\n')
+}
+
+function handleShapefile(req, res) {
   var shpStream = shp2json(req)
   var geoJSONParser = JSONStream.parse(['features', /./])
-  shpStream.on('error', function (err) {
-      res.setHeader('content-type', 'text/plain')
-      res.statusCode = 500
-      res.end(err + '\n')
-  })
+  shpStream.on('error', function(err) { sendError(res, err) })
   shpStream.on('end', function() {
     console.log((new Date - start) + 'ms')
   })
