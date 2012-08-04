@@ -6308,7 +6308,7 @@ FileToBinary.prototype.byteValue = function(x) {
 FileToBinary.prototype.end = function(chunk) { this.emit('end') }
 
 function FileSave(filename) {
-  stream.Stream.call(me)
+  stream.Stream.call(this)
   this.filename = filename || 'file'
   this.blobBuilder = new BlobBuilder()
   this.writable = true
