@@ -47,7 +47,7 @@ function createCSVs(tmpID) {
 
 function handleAccess(req, res) {
   var id = +new Date() + Math.floor(Math.random() * 999999)
-  req.pipe(fs.createWriteStream(tmpFolder + tmp))
+  req.pipe(fs.createWriteStream(tmpFolder + id))
     .on('end', function() {
       createCSVs(id, function(err, csvPath) {
         zipFolder(id).pipe(res)
