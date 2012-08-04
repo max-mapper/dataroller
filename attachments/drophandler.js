@@ -46,9 +46,18 @@ function dropHandler(e) {
     }
     var contentType = resp.headers['content-type']
     var ext = extensions[contentType]
-    var outputFile = new FileSave('converted' + ext, contentType)
-    outputFile.on('end', resetUploadState)
-    upload.pipe(new FileToBinary()).pipe(outputFile)
+    if (ext === '.zip') {
+      upload.on('end', function() {
+        var bb = new BlobBuilder()
+        bb.append(new Uint8Array(upload.req.xhr.response))
+        saveAs(bb.getBlob(contentType), 'converted' + ext)
+        resetUploadState()
+      })
+    } else {
+      var outputFile = new FileSave('converted' + ext, contentType)
+      outputFile.on('end', resetUploadState)
+      upload.pipe(outputFile)
+    }
   })
   
   fstream.pipe(fsstream).pipe(binaryConverter).pipe(upload)
