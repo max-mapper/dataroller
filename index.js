@@ -32,9 +32,11 @@ function zipCSVs(tmpID) {
 }
 
 function createCSVs(tmpID) {
+  console.log('opening', tmpFolder + tmpID)
   var db = mdb(tmpFolder + tmpID)
   db.tables(function(err, tables) {
     if (err) return console.log(err)
+    console.log(tables)
     tables.forEach(function(table) {
       fruit.toCSV(table, function(err, csv) {
         console.log(err, table, csv.split('\n').length - 1 + " lines")
