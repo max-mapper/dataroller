@@ -139,6 +139,7 @@ JSONToCSV.prototype.objectToRow = function(obj) {
     row += self.escapeCell(obj.geometry.coordinates[0])
     row += self.sep
   }
+  if (startedOutput) row += self.sep
   row += obj.geometry.type
   startedOutput = true
   row += self.sep
