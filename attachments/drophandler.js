@@ -48,8 +48,8 @@ function dropHandler(e) {
     var ext = extensions[contentType]
     if (ext === '.zip') {
       upload.on('end', function() {
-        var bb = new BlobBuilder()
-        bb.append(new Uint8Array(upload.req.xhr.response))
+        var bb = new BlobBuilder
+        bb.append(upload.req.xhr.response)
         saveAs(bb.getBlob(contentType), 'converted' + ext)
         resetUploadState()
       })
