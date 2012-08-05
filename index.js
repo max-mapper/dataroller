@@ -5,6 +5,7 @@ var util = require('util')
 var spawn = require('child_process').spawn
 var async = require('async')
 var shp2json = require('shp2json')
+var shpjson2csv = require('shpjson2csv')
 var mdb = require('mdb')
 var JSONStream = require('JSONStream')
 var ecstatic = require('ecstatic')(__dirname + '/attachments')
@@ -101,79 +102,7 @@ function handleShapefile(req, res) {
   shpStream.on('end', function() {
     console.log('shapefile', (new Date - start) + 'ms')
   })
-  var csvStream = new JSONToCSV()
+  var csvStream = shpjson2csv()
   shpStream.pipe(geoJSONParser).pipe(csvStream).pipe(res)
 }
 
-function JSONToCSV() {
-  this.headers = []
-  this.headersWritten = false
-  this.sep = ','
-  this.lineSep = '\n'
-  this.readable = true
-  this.writable = true
-  stream.Stream.call(this)
-}
-
-util.inherits(JSONToCSV, stream.Stream)
-
-JSONToCSV.prototype.objectToRow = function(obj) {
-  var startedOutput = false
-  var self = this
-  var row = ""
-  self.headers.forEach(function(header) {
-    var val = obj.properties[header]
-    if (val) {
-      if (startedOutput) row += self.sep
-      row += self.escapeCell(val)
-    } else {
-      if (startedOutput) row += self.sep
-    } 
-    startedOutput = true
-  })
-  if (obj.geometry.type === "Point") {
-    if (startedOutput) row += self.sep
-    row += self.escapeCell(obj.geometry.coordinates[1])
-    startedOutput = true
-    row += self.sep
-    row += self.escapeCell(obj.geometry.coordinates[0])
-    row += self.sep
-  }
-  if (startedOutput) row += self.sep
-  row += obj.geometry.type
-  startedOutput = true
-  row += self.sep
-  row += self.escapeCell(obj.geometry)
-  row += self.lineSep
-  return row
-}
-
-JSONToCSV.prototype.escapeCell = function(val) {
-  if (typeof(val) == "object") val = JSON.stringify(val)
-  if (typeof(val) == "string") val = val.replace(/\"/g, '""')
-  return "\"" + val + "\""
-}
-
-JSONToCSV.prototype.objectToHeaderRow = function(obj) {
-  this.headers = Object.keys(obj.properties)
-  var extraRows = []
-  if (obj.geometry.type === "Point") {
-    extraRows = ['latitude', 'longitude']
-  }
-  return this.headers.concat(extraRows).concat(['geometry', 'type']).join(this.sep) + this.lineSep
-}
-
-JSONToCSV.prototype.write = function(obj) {
-  if (!obj.properties) obj.properties = {}
-  if (!this.headersWritten) {
-    this.emit('data', this.objectToHeaderRow(obj))
-    this.headersWritten = true
-  } else {
-    this.emit('data', this.objectToRow(obj))
-  }
-  return true
-}
-
-JSONToCSV.prototype.end = function() {
-  this.emit('end')
-}
