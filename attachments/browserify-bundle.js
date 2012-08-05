@@ -6269,18 +6269,12 @@ function dropHandler(e) {
     }
     var contentType = resp.headers['content-type']
     var ext = extensions[contentType]
-    if (ext === '.zip') {
-      upload.on('end', function() {
-        var bb = new BlobBuilder
-        bb.append(upload.req.xhr.response)
-        saveAs(bb.getBlob(contentType), 'converted' + ext)
-        resetUploadState()
-      })
-    } else {
-      var outputFile = new FileSave('converted' + ext, contentType)
-      outputFile.on('end', resetUploadState)
-      upload.pipe(outputFile)
-    }
+    upload.on('end', function() {
+      var bb = new BlobBuilder
+      bb.append(upload.req.xhr.response)
+      saveAs(bb.getBlob(contentType), 'converted' + ext)
+      resetUploadState()
+    })
   })
   
   fstream.pipe(fsstream).pipe(binaryConverter).pipe(upload)
@@ -6378,25 +6372,6 @@ FileToBinary.prototype.byteValue = function(x) {
 }
  
 FileToBinary.prototype.end = function(chunk) { this.emit('end') }
-
-function FileSave(filename, contentType) {
-  stream.Stream.call(this)
-  this.contentType = contentType || 'text/plain;charset=utf-8'
-  this.filename = filename || 'file'
-  this.blobBuilder = new BlobBuilder()
-  this.writable = true
-}
-
-util.inherits(FileSave, stream.Stream)
-
-FileSave.prototype.write = function(chunk) {
-  this.blobBuilder.append(chunk)
-}
-
-FileSave.prototype.end = function() {
-  saveAs(this.blobBuilder.getBlob(this.contentType), this.filename)
-  this.emit('end')
-}
 });
 require("/attachments/drophandler.js");
 })();
