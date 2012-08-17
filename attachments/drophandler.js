@@ -3,6 +3,7 @@ var path = require('path')
 var stream = require('stream')
 var request = require('request')
 var filestream = require('domnode-filestream')
+var sendAsBinary = require('sendasbinary')
 var url = require('url')
 
 var contentTypes = {
@@ -28,7 +29,7 @@ function dropHandler(e) {
   if (!mime) return document.querySelector('.errors').innerHTML = 'only ' + Object.keys(contentTypes).join(', ') + ' supported'
   
   var fstream = filestream( file, 'binary' )
-  var binaryConverter = new FileToBinary()
+  var binaryConverter = sendAsBinary()
   fsstream = new FSStream()
   
   var currentURL = url.parse(window.location.href)
@@ -130,22 +131,4 @@ FSStream.prototype.end = function(){
   return true
 }
 
-// http://javascript0.org/wiki/Portable_sendAsBinary
-function FileToBinary() {
-  this.writable = true
-  this.readable = true
-}
 
-util.inherits(FileToBinary, stream.Stream)
-
-FileToBinary.prototype.write = function(chunk) {
-  var ords = Array.prototype.map.call(chunk, this.byteValue)
-  var ui8a = new Uint8Array(ords)
-  this.emit('data', ui8a.buffer)
-}
-
-FileToBinary.prototype.byteValue = function(x) {
-  return x.charCodeAt(0) & 0xff
-}
- 
-FileToBinary.prototype.end = function(chunk) { this.emit('end') }
