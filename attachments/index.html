@@ -15,15 +15,15 @@ a:hover {color: #d0b854; border-bottom: 1px dotted #d0b854;}
 #wrapper {position: relative; margin: auto; width: 750px; overflow: auto;}
 #content {width: 100%;}
 
-#top {margin: 40px 0px 0px 20px;}
+#top {margin-top: 40px; text-align: center;}
 
-#left       {width: 300px; float: left; padding: 20px 0px 20px 0px; }
-.fromfile   {width: 100%; height: 160px; background-image: url('shp.png'); background-repeat: no-repeat; background-position: center;}
+#left       {width: 300px; float: left; padding: 20px 0px 20px 0px;}
+.fromfile   {width: 100%; height: 133px; background-image: url('dough.png'); background-repeat: no-repeat; background-position: center;}
 .rollingpin {width: 100%; height: 81px;  background-image: url('rollingpin.png'); background-repeat: no-repeat; background-position: center;}
-.newfile    {width: 100%; height: 280px; background-image: url('csv.png'); background-repeat: no-repeat; background-position: center;}
+.newfile    {width: 100%; height: 200px; background-image: url('csv.png'); background-repeat: no-repeat; background-position: center;}
 
-#right      {width: 300px; padding: 120px 50px; float: right;}
-#right p    {font-family: Garamond; font-size: 26px; text-align: center; color: #333; line-height: 2em;}
+#right      {width: 300px; padding: 23px 60px; float: right;}
+#right p    {font-family: Garamond; font-size: 26px; text-align: center; color: #333; line-height: 1.5em; text-shadow: 0 1px 1px rgba(255, 255, 255, 0.75)}
 .sansserif  {font-family: 'Questrial'; font-size: 20px; font-weight: 100;}
 
 #bottom   {width: 100%; float: left; margin: 20px 0px 0px 0px;}
@@ -33,6 +33,38 @@ progress { display: none; width: 100%; }
 .messages { display: none; margin-top: 10px; }
 .errors { margin: 5px 0; }
 .loader { background: url('spinner.gif') no-repeat 0 0; background-size: 40px 40px; width: 40px; height: 40px; margin: 10px 0; }
+
+.btn {
+display: inline-block;
+padding: 4px 14px;
+margin-bottom: 0;
+font-size: 12px;
+line-height: 20px;
+color: #333;
+text-align: center;
+text-shadow: 0 1px 1px rgba(255, 255, 255, 0.75);
+vertical-align: middle;
+cursor: pointer;
+background-color: whiteSmoke;
+background-image: -webkit-gradient(linear, 0 0, 0 100%, from(white), to(#E6E6E6));
+background-image: -webkit-linear-gradient(top, white, #E6E6E6);
+background-image: -o-linear-gradient(top, white, #E6E6E6);
+background-image: linear-gradient(to bottom, white, #E6E6E6);
+background-image: -moz-linear-gradient(top, white, #E6E6E6);
+background-repeat: repeat-x;
+border: 1px solid #BBB;
+border-color: rgba(0, 0, 0, 0.1) rgba(0, 0, 0, 0.1) rgba(0, 0, 0, 0.25);
+border-bottom-color: #A2A2A2;
+-webkit-border-radius: 4px;
+-moz-border-radius: 4px;
+border-radius: 4px;
+filter: progid:dximagetransform.microsoft.gradient(startColorstr='#ffffffff', endColorstr='#ffe6e6e6', GradientType=0);
+filter: progid:dximagetransform.microsoft.gradient(enabled=false);
+-webkit-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.05);
+-moz-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.05);
+box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
 
 </style>
 </head>
@@ -55,6 +87,7 @@ progress { display: none; width: 100%; }
       
       <div id="right">
         <p>Drag and Drop a zipped ESRI Shapefile <span class="sansserif">.zip</span> OR a MS Access .accdb/.mdb file anywhere on the screen and get a fresh <span class="sansserif">.csv</span>.</p>
+        <span class="btn">Upload File</span>
         
         <progress class="progress" min="0" max="100" value="0">0% complete</progress>
         <div class="messages">
